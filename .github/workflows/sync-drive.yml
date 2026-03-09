@@ -6,6 +6,12 @@ on:
       reason:
         description: 'Důvod spuštění'
         default: 'automatický trigger z Google Drive'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/**'
+      - '*.html'
 
 jobs:
   sync-and-deploy:
@@ -25,27 +31,36 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalace závislostí
-        run: pip install google-api-python-client google-auth
-
-      - name: Stažení CSV z Google Drive
+      - name: Stažení CSV z Google Drive (pouze manuální spuštění)
+        if: github.event_name == 'workflow_dispatch'
         env:
           GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-        run: python .github/scripts/download_from_drive.py
-
-      - name: Commit CSV do main větve
         run: |
+          pip install google-api-python-client google-auth
+          python .github/scripts/download_from_drive.py
           git config user.name "FTK GPS Bot"
           git config user.email "bot@ftk-gps.cz"
           git add data/
           if git diff --staged --quiet; then
-            echo "Žádné nové soubory"
+            echo "Žádné nové soubory z Drive"
           else
             POCET=$(git diff --staged --name-only | wc -l)
-            git commit -m "📊 Aktualizace dat: $POCET souborů [$(date '+%d.%m.%Y %H:%M')]"
+            git commit -m "📊 Aktualizace dat z Drive: $POCET souborů [$(date '+%d.%m.%Y %H:%M')]"
             git push origin main
           fi
+
+      - name: Generuj index.json (při push triggeru)
+        if: github.event_name == 'push'
+        run: |
+          python3 -c "
+import json, pathlib
+data_dir = pathlib.Path('data')
+csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
+index = {'files': csv_files, 'count': len(csv_files)}
+(data_dir / 'index.json').write_text(json.dumps(index, ensure_ascii=False, indent=2))
+print(f'index.json aktualizován: {len(csv_files)} souborů')
+          " 
 
       - name: Checkout gh-pages větve
         uses: actions/checkout@v4
