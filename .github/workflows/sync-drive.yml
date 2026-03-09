@@ -45,21 +45,9 @@ jobs:
           if git diff --staged --quiet; then
             echo "Žádné nové soubory z Drive"
           else
-            POCET=$(git diff --staged --name-only | wc -l)
-            git commit -m "Aktualizace dat z Drive: $POCET souboru"
+            git commit -m "Aktualizace dat z Drive"
             git push origin main
           fi
-
-      - name: Generuj index.json
-        run: |
-          python3 - <<'EOF'
-import json, pathlib
-data_dir = pathlib.Path('data')
-csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
-index = {'files': csv_files, 'count': len(csv_files)}
-(data_dir / 'index.json').write_text(json.dumps(index, indent=2))
-print('index.json:', len(csv_files), 'souboru:', csv_files)
-EOF
 
       - name: Checkout gh-pages větve
         uses: actions/checkout@v4
@@ -68,16 +56,28 @@ EOF
           path: gh-pages-dir
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Zkopíruj data/ a dashboard do gh-pages
+      - name: Zkopíruj CSV do gh-pages
         run: |
           mkdir -p gh-pages-dir/data
-          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Žádné CSV"
-          cp data/index.json gh-pages-dir/data/index.json
+          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Žádné CSV v main"
           HTML=$(ls *.html 2>/dev/null | head -1)
           if [ -n "$HTML" ]; then
             cp "$HTML" gh-pages-dir/index.html
             echo "Zkopírován: $HTML"
           fi
+
+      - name: Generuj index.json přímo v gh-pages
+        run: |
+          python3 - <<'EOF'
+import json, pathlib
+data_dir = pathlib.Path('gh-pages-dir/data')
+csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
+index = {'files': csv_files, 'count': len(csv_files)}
+(data_dir / 'index.json').write_text(json.dumps(index, indent=2))
+print('index.json:', len(csv_files), 'souboru')
+for f in csv_files:
+    print(' -', f)
+EOF
 
       - name: Commit a push do gh-pages
         run: |
