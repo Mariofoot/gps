@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Důvod spuštění (automatický/manuální)'
+        description: 'Důvod spuštění'
         default: 'automatický trigger z Google Drive'
 
 jobs:
@@ -12,13 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pages: write
-      id-token: write
 
     steps:
-      - name: Checkout repozitáře
+      - name: Checkout main větve
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Nastavení Python
@@ -35,24 +34,44 @@ jobs:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: python .github/scripts/download_from_drive.py
 
-      - name: Commit nových CSV souborů
+      - name: Commit CSV do main větve
         run: |
           git config user.name "FTK GPS Bot"
           git config user.email "bot@ftk-gps.cz"
-          git add data/*.csv
+          git add data/
           if git diff --staged --quiet; then
-            echo "Žádné nové soubory — přeskakuji commit"
+            echo "Žádné nové soubory"
           else
             POCET=$(git diff --staged --name-only | wc -l)
-            git commit -m "📊 Aktualizace dat: $POCET nových CSV [$(date '+%d.%m.%Y %H:%M')]"
-            git push
-            echo "✅ Commitnuto $POCET nových souborů"
+            git commit -m "📊 Aktualizace dat: $POCET souborů [$(date '+%d.%m.%Y %H:%M')]"
+            git push origin main
           fi
 
-      - name: Deploy na GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Checkout gh-pages větve
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_branch: gh-pages
-          exclude_assets: '.github,*.md,data/'
+          ref: gh-pages
+          path: gh-pages-dir
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zkopíruj data/ a dashboard do gh-pages
+        run: |
+          # Zkopíruj složku data/ (CSV + index.json)
+          cp -r data/ gh-pages-dir/data/
+          
+          # Zkopíruj dashboard HTML (nejnovější verzi z main)
+          cp ftk-gps-dashboard-v6.html gh-pages-dir/index.html
+
+      - name: Commit a push do gh-pages
+        run: |
+          cd gh-pages-dir
+          git config user.name "FTK GPS Bot"
+          git config user.email "bot@ftk-gps.cz"
+          git add data/ index.html
+          if git diff --staged --quiet; then
+            echo "Žádné změny v gh-pages"
+          else
+            git commit -m "🚀 Deploy: aktualizace dashboardu a dat [$(date '+%d.%m.%Y %H:%M')]"
+            git push origin gh-pages
+          fi
+          echo "✅ gh-pages aktualizován"
