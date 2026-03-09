@@ -1,0 +1,58 @@
+name: Sync Google Drive → Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Důvod spuštění (automatický/manuální)'
+        default: 'automatický trigger z Google Drive'
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repozitáře
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Nastavení Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalace závislostí
+        run: pip install google-api-python-client google-auth
+
+      - name: Stažení CSV z Google Drive
+        env:
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: python .github/scripts/download_from_drive.py
+
+      - name: Commit nových CSV souborů
+        run: |
+          git config user.name "FTK GPS Bot"
+          git config user.email "bot@ftk-gps.cz"
+          git add data/*.csv
+          if git diff --staged --quiet; then
+            echo "Žádné nové soubory — přeskakuji commit"
+          else
+            POCET=$(git diff --staged --name-only | wc -l)
+            git commit -m "📊 Aktualizace dat: $POCET nových CSV [$(date '+%d.%m.%Y %H:%M')]"
+            git push
+            echo "✅ Commitnuto $POCET nových souborů"
+          fi
+
+      - name: Deploy na GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '.github,*.md,data/'
