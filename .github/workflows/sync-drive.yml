@@ -60,7 +60,13 @@ jobs:
           cp -r data/ gh-pages-dir/data/
           
           # Zkopíruj dashboard HTML (nejnovější verzi z main)
-          cp ftk-gps-dashboard-v6.html gh-pages-dir/index.html
+          HTML=$(ls *.html 2>/dev/null | head -1)
+          if [ -n "$HTML" ]; then
+            cp "$HTML" gh-pages-dir/index.html
+            echo "✅ Zkopírován: $HTML → index.html"
+          else
+            echo "⚠️  Žádný HTML soubor nenalezen v main větvi"
+          fi
 
       - name: Commit a push do gh-pages
         run: |
