@@ -71,7 +71,7 @@ jobs:
       - name: Zkopíruj data/ a dashboard do gh-pages
         run: |
           # Zkopíruj složku data/ (CSV + index.json)
-          cp -r data/ gh-pages-dir/data/
+          cp -r data/. gh-pages-dir/data/
           
           # Zkopíruj dashboard HTML (nejnovější verzi z main)
           HTML=$(ls *.html 2>/dev/null | head -1)
