@@ -43,7 +43,7 @@ jobs:
           git config user.email "bot@ftk-gps.cz"
           git add data/
           if git diff --staged --quiet; then
-            echo "Žádné nové soubory z Drive"
+            echo "Zadne nove soubory z Drive"
           else
             git commit -m "Aktualizace dat z Drive"
             git push origin main
@@ -56,28 +56,19 @@ jobs:
           path: gh-pages-dir
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Zkopíruj CSV do gh-pages
+      - name: Zkopíruj CSV a HTML do gh-pages
         run: |
           mkdir -p gh-pages-dir/data
-          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Žádné CSV v main"
+          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Zadne CSV v main"
           HTML=$(ls *.html 2>/dev/null | head -1)
           if [ -n "$HTML" ]; then
             cp "$HTML" gh-pages-dir/index.html
-            echo "Zkopírován: $HTML"
           fi
 
-      - name: Generuj index.json přímo v gh-pages
+      - name: Generuj index.json v gh-pages
         run: |
-          python3 - <<'EOF'
-import json, pathlib
-data_dir = pathlib.Path('gh-pages-dir/data')
-csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
-index = {'files': csv_files, 'count': len(csv_files)}
-(data_dir / 'index.json').write_text(json.dumps(index, indent=2))
-print('index.json:', len(csv_files), 'souboru')
-for f in csv_files:
-    print(' -', f)
-EOF
+          cd gh-pages-dir/data
+          python3 -c "import json,os; files=sorted([f for f in os.listdir('.') if f.endswith('.csv')]); open('index.json','w').write(json.dumps({'files':files,'count':len(files)},indent=2)); print('index.json:',len(files),'souboru')"
 
       - name: Commit a push do gh-pages
         run: |
@@ -86,9 +77,9 @@ EOF
           git config user.email "bot@ftk-gps.cz"
           git add data/ index.html
           if git diff --staged --quiet; then
-            echo "Žádné změny v gh-pages"
+            echo "Zadne zmeny v gh-pages"
           else
             git commit -m "Deploy: aktualizace dashboardu a dat"
             git push origin gh-pages
           fi
-          echo "gh-pages aktualizován"
+          echo "gh-pages aktualizovan"
