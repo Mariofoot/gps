@@ -46,20 +46,20 @@ jobs:
             echo "Žádné nové soubory z Drive"
           else
             POCET=$(git diff --staged --name-only | wc -l)
-            git commit -m "📊 Aktualizace dat z Drive: $POCET souborů [$(date '+%d.%m.%Y %H:%M')]"
+            git commit -m "Aktualizace dat z Drive: $POCET souboru"
             git push origin main
           fi
 
-      - name: Generuj index.json (při push triggeru)
-        if: github.event_name == 'push'
+      - name: Generuj index.json
         run: |
-          import json, pathlib
-          data_dir = pathlib.Path('data')
-          csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
-          index = {'files': csv_files, 'count': len(csv_files)}
-          (data_dir / 'index.json').write_text(json.dumps(index, indent=2))
-          print('index.json:', len(csv_files), 'souboru')
-        shell: python
+          python3 - <<'EOF'
+import json, pathlib
+data_dir = pathlib.Path('data')
+csv_files = sorted([f.name for f in data_dir.glob('*.csv')])
+index = {'files': csv_files, 'count': len(csv_files)}
+(data_dir / 'index.json').write_text(json.dumps(index, indent=2))
+print('index.json:', len(csv_files), 'souboru:', csv_files)
+EOF
 
       - name: Checkout gh-pages větve
         uses: actions/checkout@v4
@@ -70,16 +70,13 @@ jobs:
 
       - name: Zkopíruj data/ a dashboard do gh-pages
         run: |
-          # Zkopíruj složku data/ (CSV + index.json)
-          cp -r data/. gh-pages-dir/data/
-          
-          # Zkopíruj dashboard HTML (nejnovější verzi z main)
+          mkdir -p gh-pages-dir/data
+          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Žádné CSV"
+          cp data/index.json gh-pages-dir/data/index.json
           HTML=$(ls *.html 2>/dev/null | head -1)
           if [ -n "$HTML" ]; then
             cp "$HTML" gh-pages-dir/index.html
-            echo "✅ Zkopírován: $HTML → index.html"
-          else
-            echo "⚠️  Žádný HTML soubor nenalezen v main větvi"
+            echo "Zkopírován: $HTML"
           fi
 
       - name: Commit a push do gh-pages
@@ -91,7 +88,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "Žádné změny v gh-pages"
           else
-            git commit -m "🚀 Deploy: aktualizace dashboardu a dat [$(date '+%d.%m.%Y %H:%M')]"
+            git commit -m "Deploy: aktualizace dashboardu a dat"
             git push origin gh-pages
           fi
-          echo "✅ gh-pages aktualizován"
+          echo "gh-pages aktualizován"
