@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Stáhne všechna CSV z Google Drive složky do /data/
-Přeskočí soubory které už existují (podle názvu).
+Přeskočí soubory které už existují.
+Vygeneruje data/index.json se seznamem všech CSV.
 """
 import os, json, pathlib
 from google.oauth2 import service_account
@@ -9,19 +10,18 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
 
-# ── Konfigurace ────────────────────────────────────────────────────────────
-SCOPES        = ['https://www.googleapis.com/auth/drive.readonly']
-SA_JSON       = os.environ['GDRIVE_SERVICE_ACCOUNT']   # GitHub Secret (celý JSON)
-FOLDER_ID     = os.environ['GDRIVE_FOLDER_ID']          # GitHub Secret (ID složky)
-OUTPUT_DIR    = pathlib.Path('data')
+SCOPES     = ['https://www.googleapis.com/auth/drive.readonly']
+SA_JSON    = os.environ['GDRIVE_SERVICE_ACCOUNT']
+FOLDER_ID  = os.environ['GDRIVE_FOLDER_ID']
+OUTPUT_DIR = pathlib.Path('data')
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# ── Autentizace ────────────────────────────────────────────────────────────
+# Autentizace
 sa_info = json.loads(SA_JSON)
 creds   = service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
 service = build('drive', 'v3', credentials=creds)
 
-# ── Stažení CSV ────────────────────────────────────────────────────────────
+# Stažení CSV
 existing = {f.name for f in OUTPUT_DIR.glob('*.csv')}
 
 results = service.files().list(
@@ -31,18 +31,18 @@ results = service.files().list(
     pageSize=1000
 ).execute()
 
-files = results.get('files', [])
-print(f"📁 Nalezeno {len(files)} CSV souborů v Drive")
-
+files      = results.get('files', [])
 downloaded = 0
 skipped    = 0
+
+print(f"📁 Nalezeno {len(files)} CSV souborů v Drive")
 
 for f in files:
     fname = f['name']
     fpath = OUTPUT_DIR / fname
 
     if fname in existing:
-        print(f"  ⏭  Přeskočeno (již existuje): {fname}")
+        print(f"  ⏭  Přeskočeno: {fname}")
         skipped += 1
         continue
 
@@ -57,4 +57,10 @@ for f in files:
     fpath.write_bytes(buf.getvalue())
     downloaded += 1
 
+# Vygeneruj index.json se všemi CSV soubory
+all_csv = sorted([f.name for f in OUTPUT_DIR.glob('*.csv')])
+index   = {"files": all_csv, "count": len(all_csv)}
+(OUTPUT_DIR / 'index.json').write_text(json.dumps(index, ensure_ascii=False, indent=2))
+
 print(f"\n✅ Hotovo — staženo: {downloaded}, přeskočeno: {skipped}")
+print(f"📋 index.json aktualizován — celkem {len(all_csv)} CSV souborů")
