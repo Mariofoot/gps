@@ -489,7 +489,7 @@ function parseP(r){
   return{name:(r['Player Name']||'').trim(),
     dist:n(r['Distance (km)']),sprint:n(r['Sprint Distance (m)']),
     pp:n(r['Power Plays']),kcal:n(r['Energy (kcal)']),load:n(r['Player Load']),
-    topSpeed:n(r['Top Speed (m/s)']),maxAcc:n(r['Max Acceleration (m/s/s)']),
+    topSpeed:r['Top Speed (m/s)']?n(r['Top Speed (m/s)']):n(r['Top Speed (km/h)'])/3.6,maxAcc:n(r['Max Acceleration (m/s/s)']),
     z1:n(r['Distance in Speed Zone 1  (km)']),z2:n(r['Distance in Speed Zone 2  (km)']),
     z3:n(r['Distance in Speed Zone 3  (km)']),z4:n(r['Distance in Speed Zone 4  (km)']),z5:n(r['Distance in Speed Zone 5  (km)']),
     a2:n(r['Accelerations Zone Count: 2 - 3 m/s/s']),a3:n(r['Accelerations Zone Count: 3 - 4 m/s/s']),a4:n(r['Accelerations Zone Count: > 4 m/s/s']),
