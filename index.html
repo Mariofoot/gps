@@ -570,7 +570,16 @@ async function autoLoadFromRepo(){
         var r = await fetch('data/' + encodeURIComponent(fname) + '?_=' + Date.now());
         if(!r.ok) continue;
         var buf = await r.arrayBuffer();
-        var text = new TextDecoder('utf-8').decode(buf);
+        var text;
+        try {
+          text = new TextDecoder('utf-8').decode(buf);
+          // Detekuj špatné kódování - pokud obsahuje replacement char nebo typické cp1250 artefakty
+          if(text.indexOf('�') >= 0 || /Ä[-¿]|Å[-¿]/.test(text)){
+            text = new TextDecoder('windows-1250').decode(buf);
+          }
+        } catch(e) {
+          text = new TextDecoder('windows-1250').decode(buf);
+        }
         var rows = parseCSV(text);
         var grp  = {};
         rows.forEach(function(row){
@@ -791,22 +800,24 @@ function renderRiskAlerts(){
 
   /* Sekce v Upozorněních */
   if(section){
-    var rows=risks.map(function(r){
+    var items=risks.map(function(r){
       var isOver=r.maxPct>=100;
       var tc=isOver?'#ef4444':'#fb923c';
+      var bg=isOver?'rgba(239,68,68,.08)':'rgba(251,146,60,.06)';
+      var bc=isOver?'rgba(239,68,68,.3)':'rgba(251,146,60,.3)';
       var icon=isOver?'🚨':'⚡';
-      return'<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--brd)">'
+      return'<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:'+bg+';border:1px solid '+bc+';border-radius:8px">'
         +'<span style="font-size:16px">'+icon+'</span>'
         +'<div style="flex:1"><div style="font-weight:700;color:'+tc+'">'+r.name+'</div>'
-        +'<div style="font-size:11px;color:var(--mu)">'+r.alerts.map(function(a){return a.metric+': '+a.val+'m z '+a.norm+'m ('+a.pct+'%)';}).join(' · ')+'</div></div>'
-        +'<div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+tc+'">'+Math.round(r.maxPct)+'%</div></div>';
+        +'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+r.alerts.map(function(a){return a.metric+': '+a.val+'m / '+a.norm+'m';}).join(' · ')+'</div></div>'
+        +'<div style="font-family:Bebas Neue,sans-serif;font-size:24px;color:'+tc+'">'+Math.round(r.maxPct)+'%</div></div>';
     }).join('');
 
     section.innerHTML='<div class="card" style="margin-bottom:0;border-color:'+(over.length?'rgba(239,68,68,.5)':'rgba(251,146,60,.4)')+'">'
       +'<div class="ch"><h3 style="color:'+(over.length?'#ef4444':'#fb923c')+'">'
       +(over.length?'🚨':'⚡')+' Riziko přetížení &mdash; aktuální týden</h3>'
       +'<span style="font-size:11px;color:var(--mu)">Sprint Distance + Zóna 5 · hranice 80% normy</span></div>'
-      +rows+'</div>';
+      +'<div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'+items+'</div></div>';
   }
 }
 
