@@ -569,7 +569,8 @@ async function autoLoadFromRepo(){
       try {
         var r = await fetch('data/' + encodeURIComponent(fname) + '?_=' + Date.now());
         if(!r.ok) continue;
-        var text = await r.text();
+        var buf = await r.arrayBuffer();
+        var text = new TextDecoder('utf-8').decode(buf);
         var rows = parseCSV(text);
         var grp  = {};
         rows.forEach(function(row){
@@ -761,13 +762,13 @@ function renderRiskAlerts(){
 
   /* Banner na Přehledu */
   if(banner){
-    var bannerItems=risks.slice(0,6).map(function(r){
+    var bannerItems=risks.slice(0,9).map(function(r){
       var isOver=r.maxPct>=100;
       var bg=isOver?'rgba(239,68,68,.15)':'rgba(251,146,60,.15)';
       var bc=isOver?'rgba(239,68,68,.5)':'rgba(251,146,60,.5)';
       var tc=isOver?'#ef4444':'#fb923c';
       var icon=isOver?'⚠':'⚡';
-      return'<div style="background:'+bg+';border:1px solid '+bc+';border-radius:8px;padding:8px 12px;min-width:160px">'
+      return'<div style="background:'+bg+';border:1px solid '+bc+';border-radius:8px;padding:8px 12px;flex:1;min-width:200px;max-width:calc(33.33% - 6px)">'
         +'<div style="font-weight:700;color:'+tc+';font-size:13px">'+icon+' '+r.name+'</div>'
         +r.alerts.map(function(a){
           return'<div style="font-size:11px;color:'+tc+';margin-top:2px">'+a.metric+': '+a.val+'m / '+a.norm+'m ('+a.pct+'%)</div>';
