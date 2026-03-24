@@ -1,0 +1,85 @@
+name: Sync Google Drive → Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Důvod spuštění'
+        default: 'automatický trigger z Google Drive'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/**'
+      - '*.html'
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main větve
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Nastavení Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Stažení CSV z Google Drive (pouze manuální spuštění)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GDRIVE_SERVICE_ACCOUNT: ${{ secrets.GDRIVE_SERVICE_ACCOUNT }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: |
+          pip install google-api-python-client google-auth
+          python .github/scripts/download_from_drive.py
+          git config user.name "FTK GPS Bot"
+          git config user.email "bot@ftk-gps.cz"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "Zadne nove soubory z Drive"
+          else
+            git commit -m "Aktualizace dat z Drive"
+            git push origin main
+          fi
+
+      - name: Checkout gh-pages větve
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-dir
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zkopíruj CSV a HTML do gh-pages
+        run: |
+          mkdir -p gh-pages-dir/data
+          cp data/*.csv gh-pages-dir/data/ 2>/dev/null || echo "Zadne CSV v main"
+          HTML=$(ls *.html 2>/dev/null | head -1)
+          if [ -n "$HTML" ]; then
+            cp "$HTML" gh-pages-dir/index.html
+          fi
+
+      - name: Generuj index.json v gh-pages
+        run: |
+          cd gh-pages-dir/data
+          python3 -c "import json,os; files=sorted([f for f in os.listdir('.') if f.endswith('.csv')]); open('index.json','w').write(json.dumps({'files':files,'count':len(files)},indent=2)); print('index.json:',len(files),'souboru')"
+
+      - name: Commit a push do gh-pages
+        run: |
+          cd gh-pages-dir
+          git config user.name "FTK GPS Bot"
+          git config user.email "bot@ftk-gps.cz"
+          git add data/ index.html
+          if git diff --staged --quiet; then
+            echo "Zadne zmeny v gh-pages"
+          else
+            git commit -m "Deploy: aktualizace dashboardu a dat"
+            git push origin gh-pages
+          fi
+          echo "gh-pages aktualizovan"
